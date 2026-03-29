@@ -1,0 +1,52 @@
+# .github/workflows/daily_scrape.yml
+# ─────────────────────────────────────────────────────────────────────────────
+# Runs the scraper every day at 07:00 UTC and commits the output files
+# back to the repo so you always have a clean daily record.
+#
+# Setup:
+#   1. Add GEMINI_API_KEY to your repo's Settings → Secrets → Actions
+#   2. Change SUBREDDIT below (or add a matrix for multiple subreddits)
+#   3. Push this file to .github/workflows/daily_scrape.yml
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: Daily Reddit Pain Point Scrape
+
+on:
+  schedule:
+    - cron: "0 7 * * *"   # 07:00 UTC every day — adjust as needed
+  workflow_dispatch:       # also allows manual trigger from GitHub UI
+
+env:
+  SUBREDDIT: entrepreneur  # ← change this to your target subreddit
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write      # needed to commit output files back to repo
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run scraper
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python scraper.py ${{ env.SUBREDDIT }} --output-dir output
+
+      - name: Commit and push output
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/
+          git diff --cached --quiet || git commit -m "Daily scrape: r/${{ env.SUBREDDIT }} $(date +%Y-%m-%d)"
+          git push
